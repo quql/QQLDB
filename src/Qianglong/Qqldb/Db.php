@@ -1,6 +1,5 @@
 <?php
 namespace Qianglong\Qqldb;
-require_once './database.php';
 date_default_timezone_set('PRC');
 class Db
 {
