@@ -3,20 +3,10 @@ namespace Qianglong\Qqldb;
 date_default_timezone_set('PRC');
 class Db
 {
-    private $db = [
-        'host'=>'192.168.168.166',
-        'username'=>'root',
-        'password'=>'123456',
-        'dbname'=>'hub',
-        'port'=>3306,
-        'charset'=>'utf8'
-    ];
-
     private $options = array(
         \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, //默认是PDO::ERRMODE_SILENT, 0, (忽略错误模式)
         \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC, // 默认是PDO::FETCH_BOTH, 4
     );
-
     //数据库表前缀
     private static $ex = '';
     //记录当前使用的表名
@@ -31,49 +21,69 @@ class Db
     private static $sql;
     //返回sql语句标识 true 直接返回sql语句 false 执行查询
     private $returnSql = false;
+    //私有数据库配置
+    private static $database='';
     //私有的构造方法
-    private function __construct($table){
+    private function __construct(){
         //链接数据库
-        $this->connect();
+        self::connect();
     }
     //私有的克隆方法
     private function __clone(){}
 
     //完全表名
     public static function table($name=''){
+        if(empty(self::$database)){
+            require_once __DIR__.'/database.php';
+            self::$database=$database;
+        }
         //判断对象是否存在,单例模式
         if(!self::$object instanceof self){
-            self::$object = new self($name);
+            self::$object = new self();
         }
         //清空sql
         self::$sql='';
-        self::$sql .= $name;
         self::$table = $name;
         return self::$object;
     }
 
+
     //无前缀
     public static function name($name=''){
+        if(empty(self::$database)){
+            require_once __DIR__.'/database.php';
+            self::$database=$database;
+        }
         //判断对象是否存在
         if(!self::$object instanceof self){
-            self::$object = new self($name);
+            self::$object = new self();
         }
         self::$sql='';
-        self::$sql .= self::$ex.$name;
         self::$table = self::$ex.$name;
         return self::$object;
     }
 
-    //连接数据库
-    private function connect()
+    public function setTable($table){
+        self::$table = self::$ex.$table;
+        return self::$object;
+    }
+
+
+        //连接数据库
+    public function connect($dbname='')
     {
-        $config = $this->db;
+        if(empty($dbname)){
+            $config = self::$database['default_db'];
+        }else{
+            $config=self::$database[$dbname];
+        }
         $dsn = "mysql:dbname={$config['dbname']};host={$config['host']};charset=utf8";
         try{
             $this->pdo =new \PDO($dsn,$config['username'],$config['password'],$this->options);
         }catch(\PDOException $e){
             die('数据库连接失败:' . $e->getMessage());
         }
+        return self::$object;
     }
 
     //执行语句
@@ -275,9 +285,9 @@ class Db
      */
     public function select($val=''){
         if(empty($val)){
-            self::$sql = "SELECT * FROM ".self::$sql;
+            self::$sql = "SELECT * FROM ".self::$table;
         }else{
-            self::$sql = "SELECT {$val} FROM ".self::$sql;
+            self::$sql = "SELECT {$val} FROM ".self::$table;
         }
         if($this->returnSql){
             return self::$sql;
@@ -293,9 +303,9 @@ class Db
      */
     public function find($val=''){
         if(empty($val)){
-            self::$sql = "SELECT * FROM ".self::$sql." limit 1";
+            self::$sql = "SELECT * FROM ".self::$table." limit 1";
         }else{
-            self::$sql = "SELECT {$val} FROM ".self::$sql." limit 1";
+            self::$sql = "SELECT {$val} FROM ".self::$table." limit 1";
         }
         if($this->returnSql){
             return self::$sql;
@@ -322,7 +332,7 @@ class Db
      * 统计符合的记录总条数（返回数字字符串）
      */
     public function count($val='total'){
-        self::$sql = "SELECT count(*) as {$val} FROM ".self::$sql;
+        self::$sql = "SELECT count(*) as {$val} FROM ".self::$table;
         $result = $this->query(self::$sql);
         $result = $result->fetch();
         return $result[$val];
@@ -335,7 +345,7 @@ class Db
      */
     public function sum($val){
         if(!empty($val)){
-            self::$sql = "SELECT sum({$val}) as {$val} FROM ".self::$sql;
+            self::$sql = "SELECT sum({$val}) as {$val} FROM ".self::$table;
             $result = $this->query(self::$sql);
             $result = $result->fetch();
             return $result[$val];
